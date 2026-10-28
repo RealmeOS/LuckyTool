@@ -2,6 +2,7 @@ package com.luckyzyx.luckytool.hook.hookers
 
 import com.highcapable.yukihookapi.hook.entity.YukiBaseHooker
 import com.luckyzyx.luckytool.hook.scopes.systemui.HookSystemUIFeature
+import com.luckyzyx.luckytool.hook.scopes.systemui.RemoveAutoEnterSuperPowerSave
 import com.luckyzyx.luckytool.utils.DexkitUtils
 import org.lsposed.lsparanoid.Obfuscate
 
@@ -18,6 +19,9 @@ object HookSystemUI : YukiBaseHooker() {
 
             //全面屏手势相关
             loadHooker(HookSystemUIGesture(dexKitBridge))
+
+            //移除强制进入超级省电模式
+            loadHooker(RemoveAutoEnterSuperPowerSave(dexKitBridge))
         }
 
         //锁屏
