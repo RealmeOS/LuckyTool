@@ -196,6 +196,7 @@
     <string name="set_small_window_reply_blacklist">Установить черный список ответов в маленьком окне</string>
     <string name="set_small_window_reply_blacklist_message">Введите название пакета, который необходимо добавить в черный список</string>
     <string name="custom_music_fluid_cloud_whitelist">Пользовательский белый список fluid cloud</string>
+    <string name="media_music_fluid_cloud_glass_effect">Стеклянный эффект музыкального Fluid Cloud</string>
     <string name="disable_music_fluid_cloud_display">Отключить отображение fluid cloud музыки</string>
     <string name="set_custom_music_fluid_cloud_whitelist">Настроить белый список fluid cloud</string>
     <string name="disable_media_music_fluid_cloud_blacklist">Отключить черный список музыки fluid cloud</string>

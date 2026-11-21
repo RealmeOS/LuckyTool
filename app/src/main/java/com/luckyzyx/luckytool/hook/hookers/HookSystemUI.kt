@@ -22,6 +22,9 @@ object HookSystemUI : YukiBaseHooker() {
             
             //全面屏手势相关
             loadHooker(HookSystemUIGesture(dexKitBridge))
+
+            //移除强制进入超级省电模式
+            loadHooker(RemoveAutoEnterSuperPowerSave(dexKitBridge))
         }
 
         //锁屏

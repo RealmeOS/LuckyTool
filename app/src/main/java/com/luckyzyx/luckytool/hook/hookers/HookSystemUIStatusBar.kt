@@ -3,6 +3,7 @@ package com.luckyzyx.luckytool.hook.hookers
 import com.highcapable.yukihookapi.hook.entity.YukiBaseHooker
 import com.luckyzyx.luckytool.hook.scopes.systemui.CustomMusicFluidCloudWhitelist
 import com.luckyzyx.luckytool.hook.scopes.systemui.DisableMediaMusicFluidCloudBlacklist
+import com.luckyzyx.luckytool.hook.scopes.systemui.MediaMusicFluidCloudGlassEffect
 import com.luckyzyx.luckytool.hook.scopes.systemui.StatusBarIconOrder
 import com.luckyzyx.luckytool.hook.statusbar.StatusBarBattery
 import com.luckyzyx.luckytool.hook.statusbar.StatusBarClock
@@ -16,6 +17,7 @@ import com.luckyzyx.luckytool.hook.statusbar.StatusBarSilder
 import com.luckyzyx.luckytool.hook.statusbar.StatusBarTile
 import com.luckyzyx.luckytool.hook.statusbar.StatusBarUI
 import com.luckyzyx.luckytool.utils.ModulePrefs
+import com.luckyzyx.luckytool.utils.SDK
 import com.luckyzyx.luckytool.utils.getOSVersionCode
 import org.lsposed.lsparanoid.Obfuscate
 import org.luckypray.dexkit.DexKitBridge
@@ -68,6 +70,11 @@ class HookSystemUIStatusBar(val dexKitBridge: DexKitBridge) : YukiBaseHooker() {
             }
             if (preferences(ModulePrefs).getBoolean("disable_media_music_fluid_cloud_blacklist", false)) {
                 if (osCode >= 35) loadHooker(DisableMediaMusicFluidCloudBlacklist)
+            }
+            if (SDK == 37 &&
+                preferences(ModulePrefs).getBoolean("media_music_fluid_cloud_glass_effect", false)
+            ) {
+                loadHooker(MediaMusicFluidCloudGlassEffect)
             }
         }
 

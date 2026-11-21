@@ -223,6 +223,7 @@
     <string name="set_small_window_reply_blacklist">Küçük pencere kısıtlaması kara listesini (blacklist) ayarla</string>
     <string name="set_small_window_reply_blacklist_message">Kara listeye eklenmesi gereken paketin adını doldurun</string>
     <string name="custom_music_fluid_cloud_whitelist">Özel Akışkan Bulut (Fluid Cloud) Müzik uygulamarını belirleyin</string>
+    <string name="media_music_fluid_cloud_glass_effect">Medya müzik Fluid Cloud cam efekti</string>
     <string name="disable_music_fluid_cloud_display">Fluid Cloud Müzik görünümünü devre dışı bırak</string>
     <string name="set_custom_music_fluid_cloud_whitelist">Fluid Cloud Müzik beyaz listesi oluşturun</string>
     <string name="disable_media_music_fluid_cloud_blacklist">Dahili medya Fluid Cloud Müzik için kara listeyi (blacklist) devre dışı bırak</string>
