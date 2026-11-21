@@ -84,6 +84,10 @@ object StatusBarRelatedPage {
                 key = "custom_music_fluid_cloud_whitelist",
                 title = c.getString(R.string.custom_music_fluid_cloud_whitelist),
             )
+            if (SDK == 37) switch(
+                key = "media_music_fluid_cloud_glass_effect",
+                title = c.getString(R.string.media_music_fluid_cloud_glass_effect),
+            )
             if (state.getBoolean("custom_music_fluid_cloud_whitelist")) {
                 switch(
                     key = "disable_music_fluid_cloud_display",

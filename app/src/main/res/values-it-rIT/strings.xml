@@ -195,6 +195,7 @@
     <string name="set_small_window_reply_blacklist">Imposta la finestra piccola di risposta dalla Lista nera</string>
     <string name="set_small_window_reply_blacklist_message">Inserisci il nome del pacchetto che deve essere aggiunto alla lista nera</string>
     <string name="custom_music_fluid_cloud_whitelist">Personalizza whitelist Music Fluid nel cloud</string>
+    <string name="media_music_fluid_cloud_glass_effect">Effetto vetro della capsula Music Fluid Cloud</string>
     <string name="disable_music_fluid_cloud_display">Disattiva display cloud fluido musicale</string>
     <string name="set_custom_music_fluid_cloud_whitelist">Configura la whitelist cloud music fluid</string>
     <string name="disable_media_music_fluid_cloud_blacklist">Disabilita blacklist cloud Music Fluid</string>
