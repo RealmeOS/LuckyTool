@@ -33,12 +33,6 @@
     <string name="settings_navigation_badge_summary">Show an update badge on the navigation bar when a new version is available</string>
     <string name="settings_enable_predictive_back">Predictive back gesture</string>
     <string name="settings_enable_predictive_back_summary">Enable predictive back gesture support.</string>
-    <string name="settings_enable_swipe_dismiss">Swipe back gesture</string>
-    <string name="settings_enable_swipe_dismiss_summary">Swipe from the edge to return to the previous page.</string>
-    <string name="settings_pager_gesture_mode">Pager gesture mode</string>
-    <string name="settings_pager_gesture_native">Default</string>
-    <string name="settings_pager_gesture_cross_axis">Cross-axis</string>
-    <string name="settings_pager_gesture_ios_like">iOS-like</string>
     <string name="settings_page_scale">Page Scale</string>
     <string name="settings_page_scale_summary">Adjust the global display scale.</string>
     <string name="settings_ui_mode">UI Style</string>
@@ -105,6 +99,9 @@
     <string name="restore_data">Restore Data</string>
     <string name="data_backup_complete">Data backup completed!</string>
     <string name="data_backup_error">Data backup error!</string>
+    <string name="data_backup_result">Backup finished: %1$d succeeded, %2$d failed</string>
+    <string name="data_result_view_failures">View failures</string>
+    <string name="data_result_failed_entries">Failed entries</string>
     <string name="data_restore_complete">Data restore complete!</string>
     <string name="data_restore_result">Restore finished: %1$d succeeded, %2$d failed</string>
     <string name="data_backup_data_version">Backup data version</string>
@@ -212,7 +209,7 @@
     <string name="disable_long_press_home_key_start_speech_asssist">Disable long press HOME key to start speech assistant</string>
     
     <!-- CorePatch -->
-    <string name="ColorOSCorePatchTip">The official Color OS installer needs to enable other functions to use\nFunction List-Application Related-Application Installation Related</string>
+    <string name="ColorOSCorePatchTip">The official ColorOS installer needs to be used with Core Patch</string>
     <string name="corepatch">Core Patch</string>
     <string name="corepatch_summary">Remove install limits, supports Android %1$s</string>
     <string name="bypass_downgrade">Bypass downgrade</string>
@@ -1051,6 +1048,7 @@
     <string name="unlock_local_upgrade_summary">After clicking, relevant operations will be performed automatically, please wait patiently for a few seconds</string>
     <string name="remove_ota_local_update_verity">Remove OTA local update verification</string>
     <string name="enable_opex_local_install">Enable Opex local installation</string>
+    <string name="enable_opex_local_install_summary">After enabling, tap Opex in the top-right menu of the System Update page and select an archive whose filename starts with ovl_update.</string>
     <string name="disable_dm_verity_verification">Disable dm-verity verification</string>
     <string name="restore_ota_update_verity">Resume OTA update verification</string>
     <string name="restore_ota_update_verity_summary">Current Status: [%1$s]\nTry to use this feature if the OTA update prompts for validation failure or prompts for dm-verity\nDo not ask why the feature is grayed out because the system has update validation enabled by default\nWhen validation is turned off the OTA update fails, so when the feature is turned on it locks out this feature</string>
@@ -1179,6 +1177,8 @@
     <string name="app_start_dialog_use_old_version">Use the old version of the app start dialog</string>
     <string name="enable_always_allow_app_start_dialog">Enable always allow app start dialog</string>
     <string name="remove_always_allow_app_start_list">Remove the list of apps that are always allowed to be launched</string>
+    <string name="remove_rider_mode_whitelist">Remove app list whitelist</string>
+    <string name="remove_rider_mode_whitelist_summary">Allow the high-energy outdoor mode (Rider Mode) to run with any app</string>
     <string name="auto_unlock_app_ecm_permission_restrict">Auto unlock app permission management authorization restrictions</string>
     
     <!--OplusLinker-->
@@ -1405,6 +1405,7 @@
     <string name="left">Left</string>
     <string name="right">Right</string>
     <string name="close">Close</string>
+    <string name="sheet_done">Done</string>
     <string name="open">Open</string>
     <string name="share">Share</string>
     <string name="add">Add</string>

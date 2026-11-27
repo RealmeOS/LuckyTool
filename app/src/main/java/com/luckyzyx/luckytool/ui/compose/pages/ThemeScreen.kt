@@ -5,10 +5,12 @@ import android.content.Context
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -61,7 +63,6 @@ import androidx.compose.material.icons.rounded.DesignServices
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.Swipe
-import androidx.compose.material.icons.rounded.ViewCarousel
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
@@ -84,7 +85,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -92,6 +95,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -101,6 +105,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.composables.icons.lucide.R as LucideR
 import com.itos.coui.layout.CouiPageDefaults
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text as CouiText
@@ -108,6 +113,7 @@ import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.CouiTopAppBarDefaults
 import com.luckyzyx.luckytool.R
 import com.luckyzyx.luckytool.ui.compose.components.ChromeInsets
+import com.luckyzyx.luckytool.ui.compose.components.pageInset
 import com.luckyzyx.luckytool.ui.compose.components.coui.CouiPageScaffold
 import com.luckyzyx.luckytool.ui.compose.components.material.MaterialScaffold
 import com.luckyzyx.luckytool.ui.compose.components.material.MaterialToggleButton
@@ -241,16 +247,6 @@ private class ThemeScreenState(context: Context) {
         ShellSettingsController.get(context).floatingBottomBarStyle
     )
 
-    var swipeDismiss by mutableStateOf(
-        context.getBoolean(
-            SettingsPrefs,
-            ShellSettingsController.KEY_SWIPE_DISMISS,
-            true
-        )
-    )
-
-    var pagerMode by mutableIntStateOf(ShellSettingsController.get(context).pagerInterceptionMode)
-
     /** 预测式返回手势（需 Android 14+，反射 ApplicationInfo.setEnableOnBackInvokedCallback） */
     var predictiveBack by mutableStateOf(
         context.getBoolean(SettingsPrefs, ShellSettingsController.KEY_PREDICTIVE_BACK, true)
@@ -282,7 +278,7 @@ private fun rememberThemeScreenState(): ThemeScreenState {
  *
  * 页面组成：
  * 主题预览卡片 → 主题色选择（跟随系统 + 15 预设）→ 主题模式分段按钮
- * → 调色风格 / 色彩规格下拉 → 动态取色开关 →（COUI 线）跟随 Material 配色开关 → 返回与切页手势。
+ * → 调色风格 / 色彩规格下拉 → 动态取色开关 →（COUI 线）跟随 Material 配色开关 → 预测性返回手势。
  *
  * 两条外观线共用同一份列表与偏好；COUI 线额外显示「跟随 Material 配色」开关
  * （coui_dynamic_color，默认关，用 COUI 预设配色），并隐藏本线无意义的悬浮底栏项。
@@ -290,7 +286,7 @@ private fun rememberThemeScreenState(): ThemeScreenState {
  * 偏好键沿用 LuckyTool 既有约定（SettingsPrefs）：
  * dark_theme（0 跟随系统 / 1 深色 / 2 浅色 / 3 深色 AMOLED）、key_color、
  * palette_style、color_spec、use_dynamic_color、coui_dynamic_color（COUI 线专用）、
- * enable_predictive_back、enable_swipe_dismiss、pager_interception_mode。
+ * enable_predictive_back、enable_swipe_dismiss。
  * 写入后通过 [ThemePrefs.notifyChanged] 让应用主题即时重算，无需 recreate。
  */
 @Composable
@@ -393,6 +389,9 @@ private fun ThemeScreenList(
     val isDark = state.colorMode.resolveDarkTheme()
     // LazyColumn 的 item 作用域在 lambda 里，外观线的读取在这里取好再传进去。
     val isCouiLine = LocalUiMode.current == UiMode.Coui
+    // COUI 线的块间留白由库的 Group 自带（无标题组 16dp），列表不再叠加；
+    // 非分组项（取色行、模式选择、缩放卡）在这里补同档间距，Material 线仍靠列表的 13dp。
+    val couiBlockGap = if (isCouiLine) CouiPageDefaults.groupSpacing else 0.dp
     val appSettings = AppSettings(
         colorMode = state.colorMode,
         keyColor = state.keyColor,
@@ -408,7 +407,7 @@ private fun ThemeScreenList(
             top = topInset,
             bottom = bottomSpace,
         ),
-        verticalArrangement = Arrangement.spacedBy(13.dp),
+        verticalArrangement = if (isCouiLine) Arrangement.Top else Arrangement.spacedBy(13.dp),
     ) {
         item {
             ThemePreviewCard(
@@ -418,8 +417,13 @@ private fun ThemeScreenList(
         }
 
         // 首个按钮是「跟随壁纸取色」，其余为固定主题色；COUI 未开启「跟随 Material 配色」时整行隐藏。
-        if (!isCouiLine || state.couiDynamicColor) {
-            item {
+        item {
+            AnimatedVisibility(
+                visible = !isCouiLine || state.couiDynamicColor,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+                modifier = Modifier.padding(top = couiBlockGap),
+            ) {
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -460,19 +464,23 @@ private fun ThemeScreenList(
         }
 
         item {
-            ThemeModeSelector(state = state)
+            Box(modifier = Modifier.padding(top = couiBlockGap)) { ThemeModeSelector(state = state) }
         }
 
         // 调色风格 / 色彩规格两条外观线共用；COUI 未开启「跟随 Material 配色」时整组隐藏。
-        if (!isCouiLine || state.couiDynamicColor) {
-            item {
+        item {
+            AnimatedVisibility(
+                visible = !isCouiLine || state.couiDynamicColor,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
                 AppGroup(
-                    modifier = Modifier.padding(horizontal = 16.dp),
                     content = listOf(
                         {
                             val styles = PaletteStyle.entries
                             AppDropdownItem(
                                 icon = Icons.Rounded.Style,
+                                painter = painterResource(LucideR.drawable.lucide_ic_paintbrush),
                                 title = stringResource(R.string.palette_style_title),
                                 items = styles.map { it.name },
                                 selectedIndex = styles.indexOf(state.paletteStyle),
@@ -491,6 +499,7 @@ private fun ThemeScreenList(
                             val specs = ColorSpec.SpecVersion.entries
                             AppDropdownItem(
                                 icon = Icons.Rounded.DesignServices,
+                                painter = painterResource(LucideR.drawable.lucide_ic_pencil_ruler),
                                 title = stringResource(R.string.color_spec_title),
                                 items = specs.map { it.name },
                                 selectedIndex = specs.indexOf(state.colorSpec).coerceAtLeast(0),
@@ -514,12 +523,12 @@ private fun ThemeScreenList(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || isCouiLine) {
             item {
                 AppGroup(
-                    modifier = Modifier.padding(horizontal = 16.dp),
                     content = buildList<@Composable () -> Unit> {
                         // COUI 线单独决定用预设配色还是跟随 Material 的取色设置；放在动态取色上方
                         if (isCouiLine) add {
                             AppSwitchItem(
                                 icon = Icons.Rounded.Colorize,
+                                painter = painterResource(LucideR.drawable.lucide_ic_pipette),
                                 title = stringResource(R.string.coui_follow_material_color),
                                 summary = stringResource(R.string.coui_follow_material_color_summary),
                                 checked = state.couiDynamicColor,
@@ -535,25 +544,30 @@ private fun ThemeScreenList(
                             )
                         }
                         // COUI 未开启「跟随 Material 配色」时隐藏动态取色；API 31 以下同样不出现
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                            (!isCouiLine || state.couiDynamicColor)
-                        ) add {
-                            AppSwitchItem(
-                                icon = Icons.Rounded.Style,
-                                title = stringResource(R.string.use_dynamic_color),
-                                summary = stringResource(R.string.use_dynamic_color_summary),
-                                checked = state.dynamicColor,
-                                onCheckedChange = {
-                                    state.dynamicColor = it
-                                    context.putBoolean(SettingsPrefs, "use_dynamic_color", it)
-                                    // 开启动态取色时把自定义主题色归零，保证"跟随系统"色板与开关状态一致
-                                    if (it) {
-                                        state.keyColor = 0
-                                        context.putInt(SettingsPrefs, "key_color", 0)
-                                    }
-                                    ThemePrefs.notifyChanged()
-                                },
-                            )
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add {
+                            AnimatedVisibility(
+                                visible = !isCouiLine || state.couiDynamicColor,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically(),
+                            ) {
+                                AppSwitchItem(
+                                    icon = Icons.Rounded.Style,
+                                    painter = painterResource(LucideR.drawable.lucide_ic_paintbrush),
+                                    title = stringResource(R.string.use_dynamic_color),
+                                    summary = stringResource(R.string.use_dynamic_color_summary),
+                                    checked = state.dynamicColor,
+                                    onCheckedChange = {
+                                        state.dynamicColor = it
+                                        context.putBoolean(SettingsPrefs, "use_dynamic_color", it)
+                                        // 开启动态取色时把自定义主题色归零，保证"跟随系统"色板与开关状态一致
+                                        if (it) {
+                                            state.keyColor = 0
+                                            context.putInt(SettingsPrefs, "key_color", 0)
+                                        }
+                                        ThemePrefs.notifyChanged()
+                                    },
+                                )
+                            }
                         }
                     },
                 )
@@ -563,7 +577,6 @@ private fun ThemeScreenList(
         // 分类页图标配色 + 应用内手势；系统不支持预测性返回时，另外两项仍可配置。
         item {
             AppGroup(
-                modifier = Modifier.padding(horizontal = 16.dp),
                 content = buildList<@Composable () -> Unit> {
                     // 模糊开关只对 Material 线生效：低于 API 31 没有 RenderEffect，
                     // COUI 底栏的玻璃质感由自身渲染器提供，两种情况都不出现
@@ -621,6 +634,7 @@ private fun ThemeScreenList(
                     add {
                         AppSwitchItem(
                             icon = Icons.Rounded.Palette,
+                            painter = painterResource(LucideR.drawable.lucide_ic_palette),
                             title = stringResource(R.string.settings_category_badge_colors),
                             summary = stringResource(R.string.settings_category_badge_colors_summary),
                             checked = state.categoryBadgeColors,
@@ -639,6 +653,7 @@ private fun ThemeScreenList(
                         add {
                             AppSwitchItem(
                                 icon = Icons.AutoMirrored.Rounded.MenuOpen,
+                                painter = painterResource(LucideR.drawable.lucide_ic_panel_left_open),
                                 title = stringResource(R.string.settings_enable_predictive_back),
                                 summary = stringResource(R.string.settings_enable_predictive_back_summary),
                                 checked = state.predictiveBack,
@@ -655,60 +670,33 @@ private fun ThemeScreenList(
                             )
                         }
                     }
-                    add {
-                        AppSwitchItem(
-                            icon = Icons.Rounded.Swipe,
-                            title = stringResource(R.string.settings_enable_swipe_dismiss),
-                            summary = stringResource(R.string.settings_enable_swipe_dismiss_summary),
-                            checked = state.swipeDismiss,
-                            onCheckedChange = {
-                                state.swipeDismiss = it
-                                context.putBoolean(SettingsPrefs, ShellSettingsController.KEY_SWIPE_DISMISS, it)
-                                ThemePrefs.notifyChanged()
-                            },
-                        )
-                    }
-                    add {
-                        AppDropdownItem(
-                            icon = Icons.Rounded.ViewCarousel,
-                            title = stringResource(R.string.settings_pager_gesture_mode),
-                            items = listOf(
-                                stringResource(R.string.settings_pager_gesture_native),
-                                stringResource(R.string.settings_pager_gesture_cross_axis),
-                                stringResource(R.string.settings_pager_gesture_ios_like),
-                            ),
-                            selectedIndex = state.pagerMode,
-                            onItemSelected = {
-                                state.pagerMode = it
-                                context.putInt(SettingsPrefs, ShellSettingsController.KEY_PAGER_MODE, it)
-                                ThemePrefs.notifyChanged()
-                            },
-                        )
-                    }
                 },
             )
         }
 
         // 界面缩放（page_scale）：拖动只更新页内状态，松手才提交偏好，避免重建全应用密度
         item {
-            ThemeSliderCard(
-                icon = Icons.Rounded.AspectRatio,
-                title = stringResource(R.string.settings_page_scale),
-                summary = stringResource(R.string.settings_page_scale_summary),
-                valueText = "${(state.pageScale * 100).roundToInt()}%",
-                value = state.pageScale,
-                valueRange = PageScaleMin..PageScaleMax,
-                steps = 0,
-                onValueChange = { state.pageScale = it },
-                onValueChangeFinished = {
-                    context.putFloat(
-                        SettingsPrefs,
-                        ShellSettingsController.KEY_PAGE_SCALE,
-                        state.pageScale
-                    )
-                    ThemePrefs.notifyChanged()
-                },
-            )
+            Box(modifier = Modifier.padding(top = couiBlockGap)) {
+                ThemeSliderCard(
+                    icon = Icons.Rounded.AspectRatio,
+                    painter = painterResource(LucideR.drawable.lucide_ic_scaling),
+                    title = stringResource(R.string.settings_page_scale),
+                    summary = stringResource(R.string.settings_page_scale_summary),
+                    valueText = "${(state.pageScale * 100).roundToInt()}%",
+                    value = state.pageScale,
+                    valueRange = PageScaleMin..PageScaleMax,
+                    steps = 0,
+                    onValueChange = { state.pageScale = it },
+                    onValueChangeFinished = {
+                        context.putFloat(
+                            SettingsPrefs,
+                            ShellSettingsController.KEY_PAGE_SCALE,
+                            state.pageScale
+                        )
+                        ThemePrefs.notifyChanged()
+                    },
+                )
+            }
         }
 
         item {
@@ -751,7 +739,7 @@ private fun ThemeModeSelector(state: ThemeScreenState) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .pageInset(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         modes.chunked(4).forEach { rowModes ->
@@ -773,15 +761,30 @@ private fun ThemeModeSelector(state: ThemeScreenState) {
                             else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                         },
                     ) {
-                        Icon(
-                            imageVector = when (mode) {
-                                ColorMode.SYSTEM -> Icons.Filled.Brightness4
-                                ColorMode.LIGHT -> Icons.Filled.Brightness7
-                                ColorMode.DARK -> Icons.Filled.Brightness3
-                                else -> Icons.Filled.Brightness1
-                            },
-                            contentDescription = label,
-                        )
+                        if (LocalUiMode.current == UiMode.Coui) {
+                            Icon(
+                                painter = painterResource(
+                                    when (mode) {
+                                        ColorMode.SYSTEM -> LucideR.drawable.lucide_ic_sun_moon
+                                        ColorMode.LIGHT -> LucideR.drawable.lucide_ic_sun
+                                        ColorMode.DARK -> LucideR.drawable.lucide_ic_moon
+                                        // AMOLED 是纯黑底，比普通深色更暗；太阳系图标只留给系统/亮色，这里用带星月亮区分
+                                        else -> LucideR.drawable.lucide_ic_moon_star
+                                    }
+                                ),
+                                contentDescription = label,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = when (mode) {
+                                    ColorMode.SYSTEM -> Icons.Filled.Brightness4
+                                    ColorMode.LIGHT -> Icons.Filled.Brightness7
+                                    ColorMode.DARK -> Icons.Filled.Brightness3
+                                    else -> Icons.Filled.Brightness1
+                                },
+                                contentDescription = label,
+                            )
+                        }
                     }
                 }
             }
@@ -792,6 +795,9 @@ private fun ThemeModeSelector(state: ThemeScreenState) {
 /**
  * 滑杆卡片：图标 + 标题 / 说明 + 当前值，下面一条滑杆。
  *
+ * 行首图标按外观线取：[painter] 给 COUI 线，[icon] 给 Material 线，前景色也随线走，
+ * 与同页开关 / 下拉行的行首图标保持同一来源与同一颜色。
+ *
  * 取值由调用方持有（页内状态），[AppSlider] 在两条外观线上写回的都是同一份；
  * material3 的 SliderState 是非受控语义，值必须由调用方写回，否则滑块不跟手。
  * 松手回调用于提交偏好，拖动过程中不落盘。
@@ -799,6 +805,7 @@ private fun ThemeModeSelector(state: ThemeScreenState) {
 @Composable
 private fun ThemeSliderCard(
     icon: ImageVector,
+    painter: Painter? = null,
     title: String,
     summary: String,
     valueText: String,
@@ -808,14 +815,18 @@ private fun ThemeSliderCard(
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit,
 ) {
+    // 行首图标与同页开关 / 下拉行同一套取法：Material 线用 Material 矢量图与 onSurface（行首图标取卡片前景色），
+    // COUI 线用 Lucide 图与页面标题色，两条线都不再固定用 onSurfaceVariant 这类淡色
+    val isCoui = LocalUiMode.current == UiMode.Coui
     val iconTint = when (LocalUiMode.current) {
-        UiMode.Material -> MaterialTheme.colorScheme.onSurfaceVariant
-        UiMode.Coui -> CouiTheme.colorScheme.onSurfaceVariant
+        UiMode.Material -> MaterialTheme.colorScheme.onSurface
+        UiMode.Coui -> CouiPageDefaults.themeColors().title
     }
+    val iconPainter = if (isCoui) painter ?: rememberVectorPainter(icon) else rememberVectorPainter(icon)
     AppCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .pageInset(),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
@@ -823,9 +834,10 @@ private fun ThemeSliderCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = icon,
+                    painter = iconPainter,
                     contentDescription = title,
                     tint = iconTint,
+                    modifier = if (isCoui) Modifier.size(CouiPageDefaults.iconSize) else Modifier,
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -1084,7 +1096,15 @@ private fun CouiPreviewCard(isDark: Boolean) {
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.Home, null, tint = colors.accent)
+                if (LocalUiMode.current == UiMode.Coui) {
+                    Icon(
+                        painter = painterResource(LucideR.drawable.lucide_ic_house),
+                        contentDescription = null,
+                        tint = colors.accent,
+                    )
+                } else {
+                    Icon(Icons.Filled.Home, null, tint = colors.accent)
+                }
             }
         }
     }

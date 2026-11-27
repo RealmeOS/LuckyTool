@@ -12,7 +12,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -51,6 +51,7 @@ import com.itos.coui.effect.couiButtonFeedback
 import com.luckyzyx.luckytool.ui.compose.components.coui.CouiIconsExt
 import com.itos.coui.layout.CouiPageDefaults
 import com.itos.coui.layout.Divider as CouiDivider
+import com.itos.coui.layout.Group as CouiGroup
 import com.itos.coui.layout.Item as CouiItem
 import com.itos.coui.menu.Menu as CouiMenu
 import com.itos.coui.menu.CouiMenuItem
@@ -59,8 +60,6 @@ import com.itos.coui.menu.rememberCouiMenuAnchor
 import com.itos.coui.radiobutton.RadioButton as CouiRadioButton
 import com.itos.coui.slider.Slider as CouiSlider
 import com.itos.coui.switch.Switch as CouiSwitch
-import com.itos.coui.text.CouiTextKind
-import com.itos.coui.text.Text as CouiText
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.theme.LocalCouiContentColor
 import com.luckyzyx.luckytool.ui.compose.components.material.MaterialDropdownItem
@@ -91,35 +90,13 @@ private val LocalCouiRowSlot = compositionLocalOf<CouiRowSlot?> { null }
 /**
  * 祖先是否已经画好卡片背景。[CouiSegmentCard] 这类分段容器在自己这一层铺底色与圆角，
  * 行容器据此不要再补一层同色卡片，否则会出现「外层分段卡 + 内层整卡」的双层底色。
+ *
+ * 分组渲染的唯一实现（[PrefSectionRows] 的 COUI 线）也用它：卡片由分组画，行只需要正文与分隔线。
  */
-private val LocalCouiRowFramed = compositionLocalOf { false }
+internal val LocalCouiRowFramed = compositionLocalOf { false }
 
 private val isCouiAppearance: Boolean
     @Composable get() = LocalUiMode.current == UiMode.Coui
-
-/** COUI 分组卡片：一张卡片承载整组行，行间由 [CouiDivider] 切分。 */
-@Composable
-private fun CouiGroupCard(
-    modifier: Modifier = Modifier,
-    title: String = "",
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val colors = CouiPageDefaults.themeColors()
-    Column(modifier = modifier.fillMaxWidth()) {
-        if (title.isNotEmpty()) {
-            Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 6.dp)) {
-                CouiText(text = title, kind = CouiTextKind.GroupTitle, color = colors.accent)
-            }
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(CouiPageDefaults.shape)
-                .background(colors.card),
-            content = content,
-        )
-    }
-}
 
 /**
  * COUI 行容器，按祖先状态决定行自己要不要画卡片：
@@ -149,61 +126,42 @@ private fun CouiRowFrame(content: @Composable () -> Unit) {
     }
 }
 
-/** 分组：静态条目列表 */
+/**
+ * 分组：静态条目列表。
+ *
+ * 与 DSL 的 `group()`、[PrefGroup] 是同一份实现（[PrefSectionRows]）：标题、卡片、行间分隔线、
+ * 分组前后的留白都只在那一处给，这里不再自己判外观线、补内缩或直接接库的 Group。
+ */
 @Composable
 fun AppGroup(
     modifier: Modifier = Modifier,
     title: String = "",
-    visibleLen: Int = 0,
     content: List<@Composable () -> Unit>,
 ) {
     if (content.isEmpty()) return
-    if (!isCouiAppearance) {
-        MaterialGroup(modifier = modifier, title = title, visibleLen = visibleLen, content = content)
-        return
-    }
-    CouiGroupCard(modifier = modifier, title = title) {
-        content.forEachIndexed { index, itemContent ->
-            CompositionLocalProvider(LocalCouiRowSlot provides CouiRowSlot(index, inGroup = true)) {
-                itemContent()
-            }
-        }
-    }
+    PrefSectionRows(
+        modifier = modifier,
+        title = title.takeIf { it.isNotEmpty() },
+        rows = content.map { row -> PrefCardRow { row() } },
+    )
 }
 
-/** 分组：条目可显隐，显隐时整行缩放进出 */
+/** 分组：条目可显隐，显隐时整行展开/收起（渲染同样走 [PrefSectionRows]） */
 @Composable
 fun AppGroup(
     modifier: Modifier = Modifier,
     title: String = "",
     content: MaterialGroupScope.() -> Unit,
 ) {
-    if (!isCouiAppearance) {
-        MaterialGroup(modifier = modifier, title = title, content = content)
-        return
-    }
     val entries = MaterialGroupScope().apply(content).entries
     if (entries.isEmpty()) return
-    // 分隔线只跟可见行算位置：隐藏的行不占位，也不保留分组端点
-    val visibleIndices = entries.indices.filter { entries[it].visible }
-    CouiGroupCard(modifier = modifier, title = title) {
-        entries.forEachIndexed { index, entry ->
-            AnimatedVisibility(
-                visible = entry.visible,
-                enter = expandVertically(),
-                exit = shrinkVertically(),
-            ) {
-                CompositionLocalProvider(
-                    LocalCouiRowSlot provides CouiRowSlot(
-                        index = visibleIndices.indexOf(index).coerceAtLeast(0),
-                        inGroup = true,
-                    ),
-                ) {
-                    entry.content()
-                }
-            }
-        }
-    }
+    PrefSectionRows(
+        modifier = modifier,
+        title = title.takeIf { it.isNotEmpty() },
+        rows = entries.map { entry ->
+            PrefCardRow(key = entry.key, visible = entry.visible) { entry.content() }
+        },
+    )
 }
 
 /** 单条目形状提供者：Material 侧给分段圆角，COUI 侧把行标成组内条目 */
@@ -223,8 +181,13 @@ fun AppItem(
         }
         return
     }
+    // 祖先（分组渲染的唯一实现）已经画好卡片：只出正文，圆角、底色与行间线都归那一层
+    if (LocalCouiRowFramed.current) {
+        Column(modifier = Modifier.fillMaxWidth()) { content() }
+        return
+    }
     // 没有分组容器承载（列表直接平铺行）：按 index/count 自绘分段卡片，
-    // 与 CouiGroupCard 的观感一致，相邻行拼起来仍是一张连续卡片。
+    // 与库 Group 的分组卡片观感一致，相邻行拼起来仍是一张连续卡片。
     CouiSegmentCard(index = index, count = count) { content() }
 }
 
@@ -373,6 +336,7 @@ private fun CouiLongPressItem(
 @Composable
 fun AppSwitchItem(
     icon: ImageVector? = null,
+    painter: Painter? = null,
     title: String,
     summary: String? = null,
     colors: ListItemColors = materialGroupColors(),
@@ -407,8 +371,21 @@ fun AppSwitchItem(
                 role = Role.Switch,
                 onValueChange = onCheckedChange,
             ),
-            icon = leading ?: icon?.let { vector ->
-                { CouiIcon(vector, pageColors.title, CouiPageDefaults.iconSize) }
+            icon = leading ?: when {
+                painter != null -> {
+                    {
+                        Icon(
+                            painter = painter,
+                            contentDescription = null,
+                            tint = pageColors.title,
+                            modifier = Modifier.size(CouiPageDefaults.iconSize),
+                        )
+                    }
+                }
+                icon != null -> {
+                    { CouiIcon(icon, pageColors.title, CouiPageDefaults.iconSize) }
+                }
+                else -> null
             },
             title = { CouiRowTitle(title, enabled, pageColors) },
             summary = summary?.let { text -> { CouiRowSummary(text, enabled, pageColors) } },
@@ -470,6 +447,7 @@ fun AppRadioItem(
 @Composable
 fun AppDropdownItem(
     icon: ImageVector? = null,
+    painter: Painter? = null,
     title: String,
     summary: String? = null,
     items: List<String>,
@@ -527,8 +505,21 @@ fun AppDropdownItem(
                         onClick?.invoke()
                         anchor.open { expanded = true }
                     },
-                icon = leading ?: icon?.let { vector ->
-                    { CouiIcon(vector, pageColors.title, CouiPageDefaults.iconSize) }
+                icon = leading ?: when {
+                    painter != null -> {
+                        {
+                            Icon(
+                                painter = painter,
+                                contentDescription = null,
+                                tint = pageColors.title,
+                                modifier = Modifier.size(CouiPageDefaults.iconSize),
+                            )
+                        }
+                    }
+                    icon != null -> {
+                        { CouiIcon(icon, pageColors.title, CouiPageDefaults.iconSize) }
+                    }
+                    else -> null
                 },
                 title = { CouiRowTitle(title, enabled, pageColors) },
                 summary = summary?.let { text -> { CouiRowSummary(text, enabled, pageColors) } },

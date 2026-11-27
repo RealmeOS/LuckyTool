@@ -50,6 +50,7 @@ import com.luckyzyx.luckytool.R
 import com.luckyzyx.luckytool.data.AppInfo
 import com.luckyzyx.luckytool.data.DarkModeInfo
 import com.luckyzyx.luckytool.ui.compose.components.AppSearchPlaceholder
+import com.luckyzyx.luckytool.ui.compose.components.pageInset
 import com.luckyzyx.luckytool.ui.compose.components.AppSearchBar
 import com.luckyzyx.luckytool.ui.compose.components.AppSlider
 import com.luckyzyx.luckytool.ui.compose.components.PrefGroup
@@ -135,7 +136,7 @@ internal fun LazyItemScope.DarkModeContent(builder: PrefScopeBuilder) {
     var filterAppInfos by remember { mutableStateOf(ArrayList<AppInfo>()) }
     var allEnabledInfos by remember { mutableStateOf(ArrayMap<String, DarkModeInfo>()) }
 
-    var showSortSheet by remember { mutableStateOf(false) }
+    val showSortSheet = remember { mutableStateOf(false) }
 
     fun applyQuery(q: String): ArrayList<AppInfo> =
         if (q.isBlank()) allAppInfos
@@ -240,11 +241,8 @@ internal fun LazyItemScope.DarkModeContent(builder: PrefScopeBuilder) {
         modifier = Modifier.fillParentMaxHeight(),
     ) {
         Column(Modifier.fillParentMaxHeight()) {
-            // COUI 线的分组卡片自带 16dp 水平内缩（CouiScopeCard），页级 padding 只补给 Material 线，
-            // 否则开关卡左右各多缩 16dp，与搜索框 / 列表对不齐。
-            PrefGroup(
-                modifier = if (LocalUiMode.current == UiMode.Coui) Modifier else Modifier.padding(horizontal = 16.dp),
-            ) {
+            // 开关卡的水平内缩由 PrefGroup 按外观线统一给，与下方搜索框、列表保持同一左右边界
+            PrefGroup {
                 item {
                     PrefSwitchRow(
                         title = stringResource(R.string.enable_dark_mode_list),
@@ -258,7 +256,7 @@ internal fun LazyItemScope.DarkModeContent(builder: PrefScopeBuilder) {
             }
             Spacer(Modifier.height(8.dp))
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.pageInset(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 AppSearchBar(
@@ -269,8 +267,8 @@ internal fun LazyItemScope.DarkModeContent(builder: PrefScopeBuilder) {
                     },
                     placeholder = AppSearchPlaceholder,
                     enabled = !loading,
-                    filterActive = showSortSheet,
-                    onFilterClick = { showSortSheet = true },
+                    filterActive = showSortSheet.value,
+                    onFilterClick = { showSortSheet.value = true },
                 )
             }
             Spacer(Modifier.height(AppListContentGap))
@@ -294,24 +292,22 @@ internal fun LazyItemScope.DarkModeContent(builder: PrefScopeBuilder) {
         }
     }
 
-    if (showSortSheet) {
-        SortFilterSheet(
-            reverse = isReverse,
-            sortMode = sortMode,
-            sortLabels =
-                context.resources.getStringArray(R.array.sort_selector_chips).toList(),
-            onReverseChange = {
-                isReverse = !isReverse
-                scope.launch { reload() }
-            },
-            onSortChange = { mode ->
-                sortMode = mode
-                scope.launch { reload() }
-            },
-            filterContent = null,
-            onDismiss = { showSortSheet = false },
-        )
-    }
+    SortFilterSheet(
+        reverse = isReverse,
+        sortMode = sortMode,
+        sortLabels =
+            context.resources.getStringArray(R.array.sort_selector_chips).toList(),
+        onReverseChange = {
+            isReverse = !isReverse
+            scope.launch { reload() }
+        },
+        onSortChange = { mode ->
+            sortMode = mode
+            scope.launch { reload() }
+        },
+        filterContent = null,
+        visible = showSortSheet,
+    )
 }
 
 /**
@@ -408,7 +404,7 @@ internal fun DarkModeAppRow(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .pageInset().padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     when (LocalUiMode.current) {

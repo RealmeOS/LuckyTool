@@ -46,7 +46,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
+import com.composables.icons.lucide.R as LucideR
 import com.itos.coui.dialog.CouiDialogAction
 import com.itos.coui.dialog.CouiDialogActionStyle
 import com.itos.coui.dialog.CouiDialogDefaults
@@ -56,6 +59,7 @@ import com.luckyzyx.luckytool.ui.activity.MainActivity
 import com.luckyzyx.luckytool.ui.compose.components.ActionListDialog
 import com.luckyzyx.luckytool.ui.compose.components.ChoiceItem
 import com.luckyzyx.luckytool.ui.compose.components.ConfirmDialog
+import com.luckyzyx.luckytool.ui.compose.components.DataResultDialog
 import com.luckyzyx.luckytool.ui.compose.components.LocalScopeTopInset
 import com.luckyzyx.luckytool.ui.compose.components.ScopeScreen
 import com.luckyzyx.luckytool.ui.compose.components.PrefIcon
@@ -106,13 +110,14 @@ fun SettingPage(activity: MainActivity, onOpenTheme: () -> Unit = {}) {
     // 以 Configuration 作 key：语言切换后 isZh 需要重新求值
     val zh = remember(LocalConfiguration.current) { isZh(context) }
     var pendingRestoreJson by remember { mutableStateOf<JSONObject?>(null) }
+    var dataResult by remember { mutableStateOf<DataResult?>(null) }
 
     // 备份仍走系统文件选择器（落点由用户确认），只是把选择器的起始目录预设成 Download/LuckyTool；
     // 备份前先展示四个 prefs 各自的落点，回调链里没有 Composer，这段收进 lambda
     val backupLauncher = rememberLauncherForActivityResult(
         SaveBackupDocument
     ) { uri ->
-        if (uri != null) writeBackupData(activity, uri)
+        if (uri != null) writeBackupData(activity, uri) { dataResult = it }
     }
     val startBackup: () -> Unit = {
         backupLauncher.launch("LuckyTool_" + formatDate("yyyyMMdd_HHmmss") + "_backup.json")
@@ -158,7 +163,7 @@ fun SettingPage(activity: MainActivity, onOpenTheme: () -> Unit = {}) {
             val settingsUiModeTitle = stringResource(R.string.settings_ui_mode)
             val settingsUiModeSummary = stringResource(R.string.settings_ui_mode_summary)
             val settingsUiModeCouiUnavailable = stringResource(R.string.settings_ui_mode_coui_unavailable)
-            val themePaletteTitle = stringResource(R.string.theme_palette)
+            val themeSettingsTitle = stringResource(R.string.settings_theme)
             val themePaletteSummary = stringResource(R.string.theme_palette_summary)
             val autoCheckUpdateTitle = stringResource(R.string.auto_check_update)
             val autoCheckUpdateSummary = stringResource(R.string.auto_check_update_summary)
@@ -187,152 +192,180 @@ fun SettingPage(activity: MainActivity, onOpenTheme: () -> Unit = {}) {
                 ) {
                 // ---------------- 主题 ----------------
                 // 主题模式 / 主题色 / 调色风格 / 色彩规格 / 动态取色 全部迁至独立主题页
-                group()
-                // 界面风格切换（Material / COUI）：放在设置页而不是主题页，界面风格在上，主题入口在下。
-                // COUI 的顶栏 / 底栏 / 悬浮按钮依赖 API 34 的材质采样，低版本不给切换，
-                // 但仍保留一行禁用的说明，避免用户以为这条外观线不存在。
-                val couiAvailable = UiMode.Coui.isAvailable
-                val selectableUiModes = if (couiAvailable) {
-                    UiMode.entries
-                } else {
-                    UiMode.entries.filter { it != UiMode.Coui }
-                }
-                list(
-                    key = ThemeController.KEY_UI_MODE,
-                    title = settingsUiModeTitle,
-                    entries = selectableUiModes.map { it.name }.toTypedArray(),
-                    entryValues = selectableUiModes.map { it.value }.toTypedArray(),
-                    default = UiMode.DEFAULT_VALUE,
-                    summary = settingsUiModeSummary,
-                    leading = { PrefIcon(Icons.Rounded.DisplaySettings) },
-                    onChange = { ThemePrefs.notifyChanged() },
-                )
-                if (!couiAvailable) {
-                    click(
-                        title = "COUI",
-                        summary = settingsUiModeCouiUnavailable,
-                        enabled = false,
-                        leading = { PrefIcon(Icons.Rounded.DisplaySettings) },
+                group {
+                    // 界面风格切换（Material / COUI）：放在设置页而不是主题页，界面风格在上，主题入口在下。
+                    // COUI 的顶栏 / 底栏 / 悬浮按钮依赖 API 34 的材质采样，低版本不给切换，
+                    // 但仍保留一行禁用的说明，避免用户以为这条外观线不存在。
+                    val couiAvailable = UiMode.Coui.isAvailable
+                    val selectableUiModes = if (couiAvailable) {
+                        UiMode.entries
+                    } else {
+                        UiMode.entries.filter { it != UiMode.Coui }
+                    }
+                    list(
+                        key = ThemeController.KEY_UI_MODE,
+                        title = settingsUiModeTitle,
+                        entries = selectableUiModes.map { it.name }.toTypedArray(),
+                        entryValues = selectableUiModes.map { it.value }.toTypedArray(),
+                        default = UiMode.DEFAULT_VALUE,
+                        summary = settingsUiModeSummary,
+                        leading = { PrefIcon(Icons.Rounded.DisplaySettings, painter = painterResource(LucideR.drawable.lucide_ic_monitor_cog)) },
+                        onChange = { ThemePrefs.notifyChanged() },
                     )
-                }
-                // 导航入口用箭头，不暴露内部色板名称。
-                click(
-                    title = themePaletteTitle,
-                    summary = themePaletteSummary,
-                    leading = { PrefIcon(Icons.Rounded.Palette) },
-                    value = "",
-                    trailing = { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null) },
-                    onClick = onOpenTheme,
-                )
-
-                // ---------------- 其他 ----------------
-                group()
-                switch(
-                    key = "auto_check_update",
-                    title = autoCheckUpdateTitle,
-                    summary = autoCheckUpdateSummary,
-                    default = true,
-                    leading = { PrefIcon(Icons.Rounded.SystemUpdate) },
-                )
-                if (deviceSecure) {
-                    switch(
-                        key = "enable_biometric_unlock_verification",
-                        title = biometricUnlockTitle,
-                        leading = { PrefIcon(Icons.Rounded.Fingerprint) },
-                        beforeApply = { enable, apply ->
-                            if (enable) {
-                                // 验证通过才真正写入（取消或失败则不写）
-                                BiometricUtils.showBiometricPrompt(
-                                    activity,
-                                    onSucceed = { apply(true) })
+                    if (!couiAvailable) {
+                        click(
+                            title = "COUI",
+                            summary = settingsUiModeCouiUnavailable,
+                            enabled = false,
+                            leading = { PrefIcon(Icons.Rounded.DisplaySettings, painter = painterResource(LucideR.drawable.lucide_ic_monitor_cog)) },
+                        )
+                    }
+                    // 导航入口用箭头，不暴露内部色板名称。
+                    click(
+                        title = themeSettingsTitle,
+                        summary = themePaletteSummary,
+                        leading = { PrefIcon(Icons.Rounded.Palette, painter = painterResource(LucideR.drawable.lucide_ic_palette)) },
+                        value = "",
+                        trailing = {
+                            if (LocalUiMode.current == UiMode.Coui) {
+                                Icon(
+                                    painter = painterResource(
+                                        if (LocalLayoutDirection.current == LayoutDirection.Rtl) LucideR.drawable.lucide_ic_chevron_left
+                                        else LucideR.drawable.lucide_ic_chevron_right
+                                    ),
+                                    contentDescription = null,
+                                )
                             } else {
-                                apply(false)
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
                             }
                         },
+                        onClick = onOpenTheme,
                     )
+
                 }
-                switch(
-                    key = "tile_auto_start",
-                    title = tileAutoStartTitle,
-                    summary = tileAutoStartSummary,
-                    default = true,
-                    leading = { PrefIcon(Icons.Rounded.Widgets) },
-                )
-                switch(
-                    key = "hide_desktop_module_icon",
-                    title = hideModuleIconTitle,
-                    summary = hideModuleIconSummary,
-                    leading = { PrefIcon(Icons.Rounded.VisibilityOff) },
-                    onChange = { value ->
-                        AppUtils(context).setComponentDisabled(
-                            ComponentName(
-                                context.packageName,
-                                "${context.packageName}.Hide",
-                            ),
-                            value,
+                // ---------------- 其他 ----------------
+                group {
+                    switch(
+                        key = "auto_check_update",
+                        title = autoCheckUpdateTitle,
+                        summary = autoCheckUpdateSummary,
+                        default = true,
+                        leading = { PrefIcon(Icons.Rounded.SystemUpdate, painter = painterResource(LucideR.drawable.lucide_ic_refresh_cw)) },
+                    )
+                    if (deviceSecure) {
+                        switch(
+                            key = "enable_biometric_unlock_verification",
+                            title = biometricUnlockTitle,
+                            leading = { PrefIcon(Icons.Rounded.Fingerprint, painter = painterResource(LucideR.drawable.lucide_ic_fingerprint_pattern)) },
+                            beforeApply = { enable, apply ->
+                                if (enable) {
+                                    // 验证通过才真正写入（取消或失败则不写）
+                                    BiometricUtils.showBiometricPrompt(
+                                        activity,
+                                        onSucceed = { apply(true) })
+                                } else {
+                                    apply(false)
+                                }
+                            },
                         )
-                    },
-                )
+                    }
+                    switch(
+                        key = "tile_auto_start",
+                        title = tileAutoStartTitle,
+                        summary = tileAutoStartSummary,
+                        default = true,
+                        leading = { PrefIcon(Icons.Rounded.Widgets, painter = painterResource(LucideR.drawable.lucide_ic_shapes)) },
+                    )
+                    switch(
+                        key = "hide_desktop_module_icon",
+                        title = hideModuleIconTitle,
+                        summary = hideModuleIconSummary,
+                        leading = { PrefIcon(Icons.Rounded.VisibilityOff, painter = painterResource(LucideR.drawable.lucide_ic_eye_off)) },
+                        onChange = { value ->
+                            AppUtils(context).setComponentDisabled(
+                                ComponentName(
+                                    context.packageName,
+                                    "${context.packageName}.Hide",
+                                ),
+                                value,
+                            )
+                        },
+                    )
 
-                // 应用权限：与冷启动权限阻塞门是同一个页面内容（pageKey = app_permission）
-                click(
-                    title = appPermissionTitle,
-                    summary = appPermissionSummary,
-                    leading = { PrefIcon(Icons.Rounded.AdminPanelSettings) },
-                    value = "",
-                    trailing = { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null) },
-                    onClick = {
-                        activity.requestFunctionNavigation("app_permission", appPermissionTitle)
-                    },
-                )
+                    // 应用权限：与冷启动权限阻塞门是同一个页面内容（pageKey = app_permission）
+                    click(
+                        title = appPermissionTitle,
+                        summary = appPermissionSummary,
+                        leading = { PrefIcon(Icons.Rounded.AdminPanelSettings, painter = painterResource(LucideR.drawable.lucide_ic_user_cog)) },
+                        value = "",
+                        trailing = {
+                            if (LocalUiMode.current == UiMode.Coui) {
+                                Icon(
+                                    painter = painterResource(
+                                        if (LocalLayoutDirection.current == LayoutDirection.Rtl) LucideR.drawable.lucide_ic_chevron_left
+                                        else LucideR.drawable.lucide_ic_chevron_right
+                                    ),
+                                    contentDescription = null,
+                                )
+                            } else {
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
+                            }
+                        },
+                        onClick = {
+                            activity.requestFunctionNavigation("app_permission", appPermissionTitle)
+                        },
+                    )
 
+                }
                 // ---------------- 备份/恢复/清除 ----------------
-                group()
-                click(
-                    title = backupDataTitle,
-                    leading = { PrefIcon(Icons.Rounded.SaveAlt) },
-                    onClick = { showBackupDialog = true },
-                )
-                click(
-                    title = restoreDataTitle,
-                    leading = { PrefIcon(Icons.Rounded.Restore) },
-                    onClick = {
-                        FileUtils.checkDownloadDir(context, "LuckyTool").apply {
-                            if (isFile) delete()
-                            if (!exists()) mkdirs()
-                        }
-                        restoreLauncher.launch("application/json")
-                    },
-                )
-                click(
-                    title = clearAllDataTitle,
-                    summary = clearAllDataSummary,
-                    leading = { PrefIcon(Icons.Rounded.Delete) },
-                    onClick = { showClearDialog = true },
-                )
+                group {
+                    click(
+                        title = backupDataTitle,
+                        leading = { PrefIcon(Icons.Rounded.SaveAlt, painter = painterResource(LucideR.drawable.lucide_ic_download)) },
+                        onClick = { showBackupDialog = true },
+                    )
+                    click(
+                        title = restoreDataTitle,
+                        leading = { PrefIcon(Icons.Rounded.Restore, painter = painterResource(LucideR.drawable.lucide_ic_history)) },
+                        onClick = {
+                            FileUtils.checkDownloadDir(context, "LuckyTool").apply {
+                                if (isFile) delete()
+                                if (!exists()) mkdirs()
+                            }
+                            restoreLauncher.launch("application/json")
+                        },
+                    )
+                    click(
+                        title = clearAllDataTitle,
+                        summary = clearAllDataSummary,
+                        leading = { PrefIcon(Icons.Rounded.Delete, painter = painterResource(LucideR.drawable.lucide_ic_trash_2)) },
+                        onClick = { showClearDialog = true },
+                    )
 
+                }
                 // ---------------- 关于 ----------------
-                group()
-                click(
-                    title = donateTitle,
-                    summary = donateSummary,
-                    leading = { PrefIcon(Icons.Rounded.FavoriteBorder) },
-                    onClick = { showDonateList = true },
-                )
-                click(
-                    title = feedbackDownloadTitle,
-                    summary = feedbackDownloadSummary,
-                    leading = { PrefIcon(Icons.Rounded.Feedback) },
-                    onClick = { showFeedbackDialog = true },
-                )
-                click(
-                    title = participateTranslationTitle,
-                    summary = participateTranslationSummary,
-                    leading = { PrefIcon(Icons.Rounded.Translate) },
-                    onClick = {
-                        context.openUrl("https://github.com/luckyzyx/LuckyTool-Localization")
-                    },
-                )
+                group {
+                    click(
+                        title = donateTitle,
+                        summary = donateSummary,
+                        leading = { PrefIcon(Icons.Rounded.FavoriteBorder, painter = painterResource(LucideR.drawable.lucide_ic_heart)) },
+                        onClick = { showDonateList = true },
+                    )
+                    click(
+                        title = feedbackDownloadTitle,
+                        summary = feedbackDownloadSummary,
+                        leading = { PrefIcon(Icons.Rounded.Feedback, painter = painterResource(LucideR.drawable.lucide_ic_message_square_warning)) },
+                        onClick = { showFeedbackDialog = true },
+                    )
+                    click(
+                        title = participateTranslationTitle,
+                        summary = participateTranslationSummary,
+                        leading = { PrefIcon(Icons.Rounded.Translate, painter = painterResource(LucideR.drawable.lucide_ic_languages)) },
+                        onClick = {
+                            context.openUrl("https://github.com/luckyzyx/LuckyTool-Localization")
+                        },
+                    )
+                    }
                 }
             }
         }
@@ -379,6 +412,7 @@ fun SettingPage(activity: MainActivity, onOpenTheme: () -> Unit = {}) {
 
     if (showClearDialog) {
         ConfirmDialog(
+            title = stringResource(R.string.clear_all_data),
             message = stringResource(R.string.clear_all_data_message),
             onConfirm = {
                 showClearDialog = false
@@ -440,6 +474,7 @@ fun SettingPage(activity: MainActivity, onOpenTheme: () -> Unit = {}) {
             stringResource(R.string.data_backup_status_tips),
         ).joinToString("\n\n")
         ConfirmDialog(
+            title = stringResource(R.string.backup_data),
             message = message,
             onConfirm = {
                 showBackupDialog = false
@@ -491,13 +526,27 @@ fun SettingPage(activity: MainActivity, onOpenTheme: () -> Unit = {}) {
             if (remoteUnwritable) add(stringResource(R.string.data_remote_unavailable_tips))
         }.joinToString("\n\n")
         ConfirmDialog(
+            title = stringResource(R.string.restore_data),
             message = restoreMessage,
             onConfirm = {
                 pendingRestoreJson = null
-                writeRestoreData(activity, json)
+                writeRestoreData(activity, json) { dataResult = it }
             },
             onDismiss = { pendingRestoreJson = null },
             confirmLabel = stringResource(R.string.restore_data),
+        )
+    }
+
+    // 备份/恢复结束后的结果汇总：关闭后恢复流程重启 Activity，让恢复的值生效
+    dataResult?.let { result ->
+        DataResultDialog(
+            title = result.title,
+            message = result.message,
+            failedKeys = result.failedKeys,
+            onDismiss = {
+                dataResult = null
+                if (result.restartOnDismiss) activity.restart()
+            },
         )
     }
 }
@@ -553,9 +602,12 @@ private object SaveBackupDocument : ActivityResultContract<String, Uri?>() {
  *
  * 落点仍由用户在系统选择器里确认（起始目录已预设到 Download/LuckyTool），写入失败只提示错误。
  */
-private fun writeBackupData(context: Context, uri: Uri) {
+private fun writeBackupData(context: Context, uri: Uri, onResult: (DataResult) -> Unit) {
     val json = JSONObject().apply { put("osCode", getOSVersionCode) }
     val dataMapList = context.backupAllPrefs(*BackupPrefs.toTypedArray())
+    var success = 0
+    var failed = 0
+    val failedKeys = ArrayList<String>()
     dataMapList.keys.forEach { prefs ->
         val jsons = JSONObject()
         dataMapList[prefs]?.keys?.forEach { key ->
@@ -565,7 +617,8 @@ private fun writeBackupData(context: Context, uri: Uri) {
             // 不认识的类型同样不能落到那个兜底分支：记录日志后跳过该键，绝不写成字符串。
             try {
                 when (value) {
-                    null -> Unit
+                    // 空值没有可备份的内容，静默跳过（prefs.all 正常不会产生 null 值）
+                    null -> return@forEach
                     is Set<*> -> {
                         val arr = JSONArray()
                         value.forEach { arr.put(it) }
@@ -579,8 +632,11 @@ private fun writeBackupData(context: Context, uri: Uri) {
 
                     else -> error("${value.javaClass.name} is not JSON-safe")
                 }
+                success++
             } catch (t: Throwable) {
-                LogUtils.e("SettingPage", "backup skip $key", "$t", false)
+                failed++
+                failedKeys.add("$prefs/$key")
+                LogUtils.d("SettingPage", "backup skip $prefs/$key", "$t", true)
             }
         }
         json.put(prefs, JSONObject().apply {
@@ -596,7 +652,23 @@ private fun writeBackupData(context: Context, uri: Uri) {
         LogUtils.e("SettingPage", "backup write", "$it", false)
     }.isSuccess
     if (saved) {
+        if (failed > 0) {
+            LogUtils.d(
+                "SettingPage",
+                "backup result",
+                "success=$success failed=$failed " + failedKeys.joinToString(),
+                true,
+            )
+        }
         context.showToast(context.getString(R.string.data_backup_saved, backupSavedPath(context, uri)))
+        onResult(
+            DataResult(
+                title = context.getString(R.string.data_backup_complete),
+                message = context.getString(R.string.data_backup_result, success, failed),
+                failedKeys = failedKeys,
+                restartOnDismiss = false,
+            )
+        )
     } else {
         context.showToast(context.getString(R.string.data_backup_error))
     }
@@ -622,7 +694,7 @@ private fun backupSavedPath(context: Context, uri: Uri): String {
  * target 是落点而不是建议：备份记 remote 但此刻框架 service 不可用时，这些键按失败计数并提示，
  * 不静默回落到本地 —— 否则界面显示恢复成功，hook 侧却读不到。
  */
-private fun writeRestoreData(context: Context, json: JSONObject) {
+private fun writeRestoreData(context: Context, json: JSONObject, onResult: (DataResult) -> Unit) {
     if (json.length() <= 0) return
     json.remove("osCode")
     var success = 0
@@ -639,11 +711,11 @@ private fun writeRestoreData(context: Context, json: JSONObject) {
             remoteUnwritable += prefsDatas.length()
             failed += prefsDatas.length()
             failedKeys.add("$prefsName/*(${target.key} unavailable)")
-            LogUtils.e(
+            LogUtils.d(
                 "SettingPage",
                 "restore skip $prefsName",
                 "${target.key} unavailable, ${prefsDatas.length()} keys",
-                false,
+                true,
             )
             return@forEach
         }
@@ -672,31 +744,40 @@ private fun writeRestoreData(context: Context, json: JSONObject) {
                 // 恢复不了的值：记录日志、跳过，并把该键从目标 prefs 移除，不让坏数据留在设备上
                 failed++
                 failedKeys.add("$prefsName/$key")
-                LogUtils.e("SettingPage", "restore skip $prefsName/$key", "$t", false)
+                LogUtils.d("SettingPage", "restore skip $prefsName/$key", "$t", true)
                 runCatching { prefs.edit().remove(key).commit() }
             }
         }
     }
     if (failed > 0) {
-        LogUtils.e(
+        LogUtils.d(
             "SettingPage",
             "restore result",
             "success=$success failed=$failed remoteUnwritable=$remoteUnwritable " +
                     failedKeys.joinToString(),
-            false,
+            true,
         )
     }
-    context.showToast(context.getString(R.string.data_restore_result, success, failed))
-    if (remoteUnwritable > 0) {
-        context.showToast(
-            context.getString(R.string.data_restore_remote_unavailable, remoteUnwritable)
+    onResult(
+        DataResult(
+            title = context.getString(R.string.data_restore_complete),
+            message = context.getString(R.string.data_restore_result, success, failed),
+            failedKeys = failedKeys,
+            restartOnDismiss = true,
         )
-    }
-    (context as? MainActivity)?.restart()
+    )
 }
 
 /** 备份/恢复涉及的四个 prefs 文件，顺序即 JSON 里的顺序 */
 private val BackupPrefs = listOf(ModulePrefs, IntentPrefs, SettingsPrefs, OtherPrefs)
+
+/** 备份/恢复结束后的结果汇总：标题与计数正文已拼好，失败条目供「查看失败信息」明细展示 */
+private data class DataResult(
+    val title: String,
+    val message: String,
+    val failedKeys: List<String>,
+    val restartOnDismiss: Boolean,
+)
 
 /** 备份目录（外部存储相对路径）：只用来预设文件选择器打开的位置，真实落点由用户在选择器里确认 */
 private const val DOWNLOAD_TOOL_DIR = "Download/LuckyTool"

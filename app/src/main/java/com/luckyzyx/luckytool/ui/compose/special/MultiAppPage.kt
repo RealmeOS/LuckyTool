@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.luckyzyx.luckytool.R
 import com.luckyzyx.luckytool.data.AppInfo
 import com.luckyzyx.luckytool.ui.compose.components.AppSearchPlaceholder
+import com.luckyzyx.luckytool.ui.compose.components.pageInset
 import com.luckyzyx.luckytool.ui.compose.components.AppSearchBar
 import com.luckyzyx.luckytool.ui.compose.components.AppItem
 import com.luckyzyx.luckytool.ui.compose.scopes.ScopePageAction
@@ -95,7 +96,7 @@ internal fun LazyItemScope.MultiAppContent(builder: PrefScopeBuilder) {
     var filterAppInfos by remember { mutableStateOf(ArrayList<AppInfo>()) }
     var allEnabledInfos by remember { mutableStateOf(ArraySet<String>()) }
 
-    var showSortSheet by remember { mutableStateOf(false) }
+    val showSortSheet = remember { mutableStateOf(false) }
 
     fun applyQuery(q: String): ArrayList<AppInfo> =
         if (q.isBlank()) allAppInfos
@@ -189,7 +190,7 @@ internal fun LazyItemScope.MultiAppContent(builder: PrefScopeBuilder) {
     ) {
         Column(Modifier.fillParentMaxHeight()) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.pageInset(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 AppSearchBar(
@@ -200,8 +201,8 @@ internal fun LazyItemScope.MultiAppContent(builder: PrefScopeBuilder) {
                     },
                     placeholder = AppSearchPlaceholder,
                     enabled = !loading,
-                    filterActive = showSortSheet,
-                    onFilterClick = { showSortSheet = true },
+                    filterActive = showSortSheet.value,
+                    onFilterClick = { showSortSheet.value = true },
                 )
             }
             Spacer(Modifier.height(AppListContentGap))
@@ -213,22 +214,20 @@ internal fun LazyItemScope.MultiAppContent(builder: PrefScopeBuilder) {
         }
     }
 
-    if (showSortSheet) {
-        SortFilterSheet(
-            reverse = isReverse,
-            sortMode = sortMode,
-            sortLabels =
-                context.resources.getStringArray(R.array.sort_selector_chips).toList(),
-            onReverseChange = {
-                isReverse = !isReverse
-                scope.launch { reload() }
-            },
-            onSortChange = { mode ->
-                sortMode = mode
-                scope.launch { reload() }
-            },
-            filterContent = null,
-            onDismiss = { showSortSheet = false },
-        )
-    }
+    SortFilterSheet(
+        reverse = isReverse,
+        sortMode = sortMode,
+        sortLabels =
+            context.resources.getStringArray(R.array.sort_selector_chips).toList(),
+        onReverseChange = {
+            isReverse = !isReverse
+            scope.launch { reload() }
+        },
+        onSortChange = { mode ->
+            sortMode = mode
+            scope.launch { reload() }
+        },
+        filterContent = null,
+        visible = showSortSheet,
+    )
 }

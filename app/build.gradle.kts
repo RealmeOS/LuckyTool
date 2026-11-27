@@ -17,7 +17,11 @@ lsparanoid {
 
 android {
     namespace = gropify.project.groupName
-    compileSdk = gropify.project.android.compileSdk
+    compileSdk {
+        version = release(gropify.project.android.compileSdk) {
+            minorApiLevel = gropify.project.android.compileSdkMinor
+        }
+    }
 
     defaultConfig {
         applicationId = gropify.project.groupName
@@ -152,6 +156,8 @@ dependencies {
     implementation(libs.coui.material3)
     //COUI 图标（独立 artifact：矢量与位图图标，日夜配色跟随 COUI 主题）
     implementation(libs.coui.icons)
+    //Lucide 图标（通用图标线：24dp 网格、2px 圆角描边、可染色）
+    implementation(libs.lucide.icons)
     //Markdown
     implementation(libs.markwon.core)
     implementation(libs.markwon.html)

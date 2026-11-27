@@ -55,6 +55,7 @@ import com.luckyzyx.luckytool.R
 import com.luckyzyx.luckytool.data.MemcConfigActivity
 import com.luckyzyx.luckytool.data.MemcConfigPackage
 import com.luckyzyx.luckytool.ui.compose.components.ActionListDialog
+import com.luckyzyx.luckytool.ui.compose.components.pageInset
 import com.luckyzyx.luckytool.ui.compose.components.AppPickerDialog
 import com.luckyzyx.luckytool.ui.compose.components.dialogBodyMaxHeight
 import com.luckyzyx.luckytool.ui.compose.components.ChoiceItem
@@ -366,6 +367,7 @@ internal fun LazyItemScope.MemcConfigContent() {
 
     if (showResetConfirm) {
         ConfirmDialog(
+            title = stringResource(R.string.reset),
             message = stringResource(R.string.restore_frame_insertion_configuration_data),
             onDismiss = { showResetConfirm = false },
             onConfirm = {
@@ -427,7 +429,7 @@ private fun MemcTabRow(selected: Int, onSelect: (Int) -> Unit) {
             labels = labels,
             selectedIndex = selected,
             onSelect = onSelect,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.pageInset().padding(vertical = 8.dp),
         )
     }
 }
@@ -450,7 +452,7 @@ private fun MemcSearchField(
             placeholder = { Text(placeholder) },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .pageInset(),
         )
 
         UiMode.Coui -> CouiTextField(
@@ -461,7 +463,7 @@ private fun MemcSearchField(
             placeholder = placeholder,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .pageInset(),
         )
     }
 }
@@ -502,7 +504,7 @@ private fun MaterialMemcPackagePanel(
         PrefCard(
             title = "＋ Add",
             onClick = { onEdit(null) },
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.pageInset(),
         )
         if (state.pkgFilter.isEmpty() && !state.pkgLoading) {
             Box(
@@ -558,7 +560,7 @@ private fun CouiMemcPackagePanel(
             enabled = !state.pkgLoading,
             placeholder = "PackageName",
         )
-        // COUI 线的卡片自带 16dp 水平内缩（CouiScopeCard），这里再补会与搜索框、列表行差 16dp；
+        // COUI 线的卡片自带 16dp 水平内缩（CouiCard / 库的 Group），这里再补会与搜索框、列表行差 16dp；
         // Material 线的卡片不自带内缩，那边保留 16dp
         PrefCard(
             title = "＋ Add",
@@ -656,7 +658,7 @@ private fun MaterialMemcActivityPanel(
         PrefCard(
             title = "＋ Add",
             onClick = { onEdit(null) },
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.pageInset(),
         )
         if (state.actFilter.isEmpty() && !state.actLoading) {
             Box(
@@ -716,7 +718,7 @@ private fun CouiMemcActivityPanel(
             enabled = !state.actLoading,
             placeholder = "PackageName / ActivityName",
         )
-        // COUI 线的卡片自带 16dp 水平内缩（CouiScopeCard），这里再补会与搜索框、列表行差 16dp；
+        // COUI 线的卡片自带 16dp 水平内缩（CouiCard / 库的 Group），这里再补会与搜索框、列表行差 16dp；
         // Material 线的卡片不自带内缩，那边保留 16dp
         PrefCard(
             title = "＋ Add",
@@ -873,6 +875,7 @@ internal fun MemcPackageDialog(
 
     if (showDeleteConfirm && initial != null) {
         ConfirmDialog(
+            title = stringResource(R.string.remove),
             message = stringResource(
                 R.string.confirm_to_delete_this_configuration,
                 initial.packName,
@@ -1234,6 +1237,7 @@ internal fun MemcActivityDialog(
 
     if (showDeleteConfirm && initial != null) {
         ConfirmDialog(
+            title = stringResource(R.string.remove),
             message = stringResource(
                 R.string.confirm_to_delete_this_configuration,
                 initial.activity,

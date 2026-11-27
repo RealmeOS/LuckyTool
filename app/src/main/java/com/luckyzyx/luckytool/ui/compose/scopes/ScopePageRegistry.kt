@@ -21,12 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.luckyzyx.luckytool.R
+import com.luckyzyx.luckytool.ui.compose.components.LocalTopBarCollapsedFraction
 import com.luckyzyx.luckytool.ui.compose.components.PrefIndexItem
 import com.luckyzyx.luckytool.ui.compose.components.PrefScopeBuilder
 import com.luckyzyx.luckytool.ui.compose.components.ScopeScreen
 import com.luckyzyx.luckytool.ui.compose.components.ScrollTarget
 import com.luckyzyx.luckytool.ui.compose.components.coui.CouiPullToRefreshBox
-import com.luckyzyx.luckytool.ui.compose.components.LocalTopBarCollapsedFraction
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusAlarmClockPage
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusBatteryPage
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusBeaconLinkPage
@@ -55,6 +55,7 @@ import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusOTAPage
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusPermissionControllerPage
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusPhoneManagerPage
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusPictorialPage
+import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusRiderModePage
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusScreenshotPage
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusSearchBoxPage
 import com.luckyzyx.luckytool.ui.compose.scopes.apps.OplusSecuritypPermissionPage
@@ -83,7 +84,9 @@ import com.luckyzyx.luckytool.ui.compose.scopes.related.LauncherRelatedPage
 import com.luckyzyx.luckytool.ui.compose.scopes.related.LockScreenRelatedPage
 import com.luckyzyx.luckytool.ui.compose.scopes.related.MiscellaneousPage
 import com.luckyzyx.luckytool.ui.compose.scopes.related.SoundRelatedPage
+import com.luckyzyx.luckytool.ui.compose.scopes.related.StatusBarRelatedPage
 import com.luckyzyx.luckytool.ui.compose.scopes.statusbar.StatusBarBatteryPage
+import com.luckyzyx.luckytool.ui.compose.scopes.statusbar.StatusBarClockPage
 import com.luckyzyx.luckytool.ui.compose.scopes.statusbar.StatusBarControlCenterPage
 import com.luckyzyx.luckytool.ui.compose.scopes.statusbar.StatusBarIconOrderPage
 import com.luckyzyx.luckytool.ui.compose.scopes.statusbar.StatusBarIconPage
@@ -314,7 +317,7 @@ internal fun ScopePageContent(
         }
         listState.animateScrollToItem(targetSlot)
         builder.highlightSlot.value = targetSlot
-        delay(2500.milliseconds)
+        delay(2000.milliseconds)
         if (builder.highlightSlot.value == targetSlot) builder.highlightSlot.value = null
     }
 
@@ -358,6 +361,7 @@ internal fun ScopePageContent(
             ) {
                 page(Modifier.fillMaxSize())
             }
+
             UiMode.Coui -> CouiPullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = refresh,
@@ -385,7 +389,7 @@ object ScopePageRegistry {
     fun all(): List<ScopePageSpec> = pages.values.toList()
 
     /**
-     * headless 构建一页的搜索索引（条件可见性已由 DSL 的 Kotlin if 应用）。
+     * headless 构建一页的搜索索引（条件可见性由 DSL 的 Kotlin if 或行的 `visible` 承担）。
      * 构建是纯记录（emit 不渲染），可在任意线程运行；功能树、全屏搜索与 DSL page() 子页入口可达性判断共用。
      * 注意：空索引**不等于**该页不可见——见 [hasVisibleContent]。
      */
@@ -447,7 +451,7 @@ object ScopePageRegistry {
         }
     }
 
-    /** 功能树页面顺序（功能树按此固定排序，共 51 页） */
+    /** 功能树页面顺序（功能树按此固定排序，共 52 页） */
     val treeOrder: List<String> = listOf(
         "android_related",
         "statusbar",
@@ -468,6 +472,7 @@ object ScopePageRegistry {
         "oplus_camera",
         "oplus_gallery",
         "oplus_games",
+        "oplus_rider_mode",
         "theme_store",
         "oplus_market",
         "oplus_cloud_service",
@@ -636,6 +641,7 @@ object ScopePageRegistry {
         register(OplusPermissionControllerPage.spec)
         register(OplusPhoneManagerPage.spec)
         register(OplusPictorialPage.spec)
+        register(OplusRiderModePage.spec)
         register(OplusScreenshotPage.spec)
         register(OplusSearchBoxPage.spec)
         register(OplusSecuritypPermissionPage.spec)

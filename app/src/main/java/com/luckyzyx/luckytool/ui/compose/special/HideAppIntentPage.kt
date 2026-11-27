@@ -62,6 +62,7 @@ import com.luckyzyx.luckytool.data.AppInfo
 import com.luckyzyx.luckytool.data.AppIntentInfo
 import com.luckyzyx.luckytool.enums.IntentType
 import com.luckyzyx.luckytool.ui.compose.components.AppSearchBar
+import com.luckyzyx.luckytool.ui.compose.components.pageInset
 import com.luckyzyx.luckytool.ui.compose.components.AppSearchPlaceholder
 import com.luckyzyx.luckytool.ui.compose.components.ChoiceItem
 import com.luckyzyx.luckytool.ui.compose.components.MultiChoiceDialog
@@ -187,7 +188,7 @@ internal fun LazyItemScope.HideAppIntentContent() {
     var allIntentInfos by remember { mutableStateOf(ArrayList<AppIntentInfo>()) }
     var allEnabledInfos by remember { mutableStateOf(ArrayList<AppIntentInfo>()) }
 
-    var showSortSheet by remember { mutableStateOf(false) }
+    val showSortSheet = remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
     var selectDialog by remember { mutableStateOf<IntentDialogData?>(null) }
 
@@ -446,11 +447,8 @@ internal fun LazyItemScope.HideAppIntentContent() {
         modifier = Modifier.fillParentMaxHeight(),
     ) {
         Column(Modifier.fillParentMaxHeight()) {
-            // COUI 线的分组卡片自带 16dp 水平内缩（CouiScopeCard），页级 padding 只补给 Material 线，
-            // 否则开关卡左右各多缩 16dp，与搜索框 / 列表对不齐。
-            PrefGroup(
-                modifier = if (LocalUiMode.current == UiMode.Coui) Modifier else Modifier.padding(horizontal = 16.dp),
-            ) {
+            // 开关卡的水平内缩由 PrefGroup 按外观线统一给，与下方搜索框、列表保持同一左右边界
+            PrefGroup {
                 item {
                     PrefSwitchRow(
                         title = stringResource(R.string.custom_config_app_intent_list),
@@ -464,7 +462,7 @@ internal fun LazyItemScope.HideAppIntentContent() {
             }
             Spacer(Modifier.height(8.dp))
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.pageInset(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 AppSearchBar(
@@ -472,8 +470,8 @@ internal fun LazyItemScope.HideAppIntentContent() {
                     onQueryChange = onQueryChange,
                     placeholder = AppSearchPlaceholder,
                     enabled = !loading,
-                    filterActive = showSortSheet,
-                    onFilterClick = { showSortSheet = true },
+                    filterActive = showSortSheet.value,
+                    onFilterClick = { showSortSheet.value = true },
                 )
             }
             Spacer(Modifier.height(AppListContentGap))
@@ -542,98 +540,96 @@ internal fun LazyItemScope.HideAppIntentContent() {
         )
     }
 
-    if (showSortSheet) {
-        SortFilterSheet(
-            reverse = isReverse,
-            sortMode = sortMode,
-            sortLabels =
-                context.resources.getStringArray(R.array.sort_selector_chips).toList(),
-            onReverseChange = {
-                isReverse = !isReverse
-                scope.launch { reload() }
-            },
-            onSortChange = { mode ->
-                sortMode = mode
-                scope.launch { reload() }
-            },
-            filterContent = {
-                // 弹层本身已分线，但筛选项的标签由调用方提供，必须跟着渲染线换控件：
-                // 两份标签算一遍（状态与回调只建一次），再各按线渲染。
-                val chips = listOf(
-                    FilterChipSpec(
-                        label = stringResource(R.string.appinfo_system_app),
-                        selected = showSystemApps,
-                        onClick = {
-                            showSystemApps = !showSystemApps
-                            scope.launch { reload() }
-                        },
-                    ),
-                    FilterChipSpec(
-                        label = stringResource(R.string.intent_share),
-                        selected = intentFilter.contains(IntentType.SINGLE_SHARE),
-                        onClick = {
-                            setFilterTypes(
-                                arrayOf(IntentType.SINGLE_SHARE, IntentType.MULTI_SHARE),
-                                !intentFilter.contains(IntentType.SINGLE_SHARE),
-                            )
-                        },
-                    ),
-                    FilterChipSpec(
-                        label = stringResource(R.string.intent_text),
-                        selected = intentFilter.contains(IntentType.PROCESS_TEXT),
-                        onClick = {
-                            setFilterTypes(
-                                arrayOf(IntentType.PROCESS_TEXT),
-                                !intentFilter.contains(IntentType.PROCESS_TEXT),
-                            )
-                        },
-                    ),
-                    FilterChipSpec(
-                        label = stringResource(R.string.intent_open),
-                        selected = intentFilter.contains(IntentType.CONTENT),
-                        onClick = {
-                            setFilterTypes(
-                                arrayOf(IntentType.CONTENT, IntentType.FILE),
-                                !intentFilter.contains(IntentType.CONTENT),
-                            )
-                        },
-                    ),
-                    FilterChipSpec(
-                        label = stringResource(R.string.intent_browser),
-                        selected = intentFilter.contains(IntentType.HTTP_LINK),
-                        onClick = {
-                            setFilterTypes(
-                                arrayOf(IntentType.HTTP_LINK, IntentType.HTTPS_LINK),
-                                !intentFilter.contains(IntentType.HTTP_LINK),
-                            )
-                        },
-                    ),
-                )
-                when (LocalUiMode.current) {
-                    UiMode.Material -> FlowRow {
-                        chips.forEach { chip ->
-                            FilterChip(
-                                selected = chip.selected,
-                                onClick = chip.onClick,
-                                label = { Text(chip.label) },
-                            )
-                        }
-                    }
-
-                    UiMode.Coui -> FlowRow {
-                        chips.forEach { chip ->
-                            CouiFilterChip(
-                                label = chip.label,
-                                selected = chip.selected,
-                                onClick = chip.onClick,
-                            )
-                        }
+    SortFilterSheet(
+        reverse = isReverse,
+        sortMode = sortMode,
+        sortLabels =
+            context.resources.getStringArray(R.array.sort_selector_chips).toList(),
+        onReverseChange = {
+            isReverse = !isReverse
+            scope.launch { reload() }
+        },
+        onSortChange = { mode ->
+            sortMode = mode
+            scope.launch { reload() }
+        },
+        filterContent = {
+            // 弹层本身已分线，但筛选项的标签由调用方提供，必须跟着渲染线换控件：
+            // 两份标签算一遍（状态与回调只建一次），再各按线渲染。
+            val chips = listOf(
+                FilterChipSpec(
+                    label = stringResource(R.string.appinfo_system_app),
+                    selected = showSystemApps,
+                    onClick = {
+                        showSystemApps = !showSystemApps
+                        scope.launch { reload() }
+                    },
+                ),
+                FilterChipSpec(
+                    label = stringResource(R.string.intent_share),
+                    selected = intentFilter.contains(IntentType.SINGLE_SHARE),
+                    onClick = {
+                        setFilterTypes(
+                            arrayOf(IntentType.SINGLE_SHARE, IntentType.MULTI_SHARE),
+                            !intentFilter.contains(IntentType.SINGLE_SHARE),
+                        )
+                    },
+                ),
+                FilterChipSpec(
+                    label = stringResource(R.string.intent_text),
+                    selected = intentFilter.contains(IntentType.PROCESS_TEXT),
+                    onClick = {
+                        setFilterTypes(
+                            arrayOf(IntentType.PROCESS_TEXT),
+                            !intentFilter.contains(IntentType.PROCESS_TEXT),
+                        )
+                    },
+                ),
+                FilterChipSpec(
+                    label = stringResource(R.string.intent_open),
+                    selected = intentFilter.contains(IntentType.CONTENT),
+                    onClick = {
+                        setFilterTypes(
+                            arrayOf(IntentType.CONTENT, IntentType.FILE),
+                            !intentFilter.contains(IntentType.CONTENT),
+                        )
+                    },
+                ),
+                FilterChipSpec(
+                    label = stringResource(R.string.intent_browser),
+                    selected = intentFilter.contains(IntentType.HTTP_LINK),
+                    onClick = {
+                        setFilterTypes(
+                            arrayOf(IntentType.HTTP_LINK, IntentType.HTTPS_LINK),
+                            !intentFilter.contains(IntentType.HTTP_LINK),
+                        )
+                    },
+                ),
+            )
+            when (LocalUiMode.current) {
+                UiMode.Material -> FlowRow {
+                    chips.forEach { chip ->
+                        FilterChip(
+                            selected = chip.selected,
+                            onClick = chip.onClick,
+                            label = { Text(chip.label) },
+                        )
                     }
                 }
-            },
-            onDismiss = { showSortSheet = false },
-        )
-    }
+
+                UiMode.Coui -> FlowRow {
+                    chips.forEach { chip ->
+                        CouiFilterChip(
+                            label = chip.label,
+                            selected = chip.selected,
+                            onClick = chip.onClick,
+                        )
+                    }
+                }
+            }
+        },
+        visible = showSortSheet,
+    )
 }
 
 /**

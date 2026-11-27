@@ -63,9 +63,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import com.luckyzyx.luckytool.R
 import com.itos.coui.icons.CouiIcons
 import com.itos.coui.layout.CouiPageDefaults
@@ -73,6 +70,7 @@ import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text as CouiText
 import com.itos.coui.theme.CouiTheme
 import com.luckyzyx.luckytool.ui.activity.MainActivity
+import com.luckyzyx.luckytool.ui.activity.SecondaryActivity
 import com.luckyzyx.luckytool.ui.compose.components.ChromeInsets
 import com.luckyzyx.luckytool.ui.compose.components.GateDialog
 import com.luckyzyx.luckytool.ui.compose.components.LocalCouiTabsBarSlot
@@ -88,7 +86,6 @@ import com.luckyzyx.luckytool.ui.compose.pages.HomePage
 import com.luckyzyx.luckytool.ui.compose.pages.OtherPage
 import com.luckyzyx.luckytool.ui.compose.pages.SearchPage
 import com.luckyzyx.luckytool.ui.compose.pages.SettingPage
-import com.luckyzyx.luckytool.ui.compose.pages.ThemeScreen
 import com.luckyzyx.luckytool.ui.compose.special.AppPermissionContent
 import com.luckyzyx.luckytool.ui.shell.LocalEnableBlur
 import com.luckyzyx.luckytool.ui.shell.LocalEnableFloatingBottomBar
@@ -129,25 +126,39 @@ internal fun MainTab.icon(): ImageVector = when (this) {
     MainTab.Setting -> CouiIcons.Filled.Setting
 }
 
+/** 底栏页签图标的一对形态：未选中描边、选中实心。 */
+internal class MainTabIcons(val unselected: ImageVector, val selected: ImageVector)
+
+/**
+ * 要表达选中态的底栏图标对。
+ *
+ * COUI 底栏在库内部画图标，染色固定成黑/白、没有逐项的透明度，改色调或渐变都没有入口，
+ * 能区分选中态的只有换图形，所以未选中给描边、选中给实心。官方集里只有齿轮两态齐全，
+ * 其余页签缺的那一半由 [CouiIconsExt] 补齐。
+ */
+@Composable
+internal fun MainTab.iconPair(): MainTabIcons = when (this) {
+    MainTab.Other -> MainTabIcons(CouiIconsExt.GridOutlined, CouiIcons.Filled.Grid)
+    MainTab.Function -> MainTabIcons(CouiIcons.Outlined.SliderCustom, CouiIconsExt.SliderCustomFilled)
+    MainTab.Home -> MainTabIcons(CouiIconsExt.Home, CouiIconsExt.HomeFilled)
+    MainTab.Search -> MainTabIcons(CouiIcons.Outlined.Search, CouiIconsExt.SearchFilled)
+    MainTab.Setting -> MainTabIcons(CouiIcons.Outlined.Setting, CouiIcons.Filled.Setting)
+}
+
 @Composable
 fun MainShell(activity: MainActivity) {
-    val navController = rememberNavController()
     val pagerState = rememberPagerState(initialPage = MainTab.Home.ordinal) { MainTab.entries.size }
     val mainPagerState = rememberMainPagerState(pagerState)
     val settledTab = MainTab.entries[pagerState.settledPage]
-    // 标签外壳是导航起点：栈顶回到 MainRoute 时一级标签才算「在场」
-    val backStackEntry by navController.currentBackStackEntryAsState()
-    val atMain = backStackEntry == null ||
-        backStackEntry?.destination?.hasRoute<MainRoute>() == true
-    LaunchedEffect(atMain, settledTab) {
-        activity.isOnFunctionTab = atMain && settledTab == MainTab.Function
-        activity.isOnHomeTab = atMain && settledTab == MainTab.Home
+    LaunchedEffect(settledTab) {
+        activity.isOnFunctionTab = settledTab == MainTab.Function
+        activity.isOnHomeTab = settledTab == MainTab.Home
     }
-    LaunchedEffect(activity, navController) {
+    LaunchedEffect(activity) {
         activity.functionNavRequests.collect { request ->
             if (request != null) {
                 activity.functionNavRequests.value = null
-                navController.navigatePage(ScopeRoute(request.pageKey, request.title.orEmpty()))
+                SecondaryActivity.openScope(activity, request.pageKey, request.title.orEmpty())
             }
         }
     }
@@ -166,53 +177,34 @@ fun MainShell(activity: MainActivity) {
         return
     }
 
-    // 标签页不是页面栈：主页之外的标签先返回主页，页面返回由 NavHost 接管。
+    // 标签页不是页面栈：主页之外的标签先返回主页；二级页是独立 Activity，返回由系统接管。
     MainPagerBackHandler(
         state = mainPagerState,
-        enabled = atMain && activity.gateDialog == null,
+        enabled = activity.gateDialog == null,
     )
 
     val shellContent: @Composable (PaddingValues) -> Unit = { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            AppNavHost(
-                navController = navController,
-                modifier = Modifier.fillMaxSize(),
-                mainContent = {
-                    MainTabs(
-                        mainPagerState = mainPagerState,
-                        isActive = atMain && activity.gateDialog == null,
-                    ) { tab, isCurrentPage ->
-                        when (tab) {
-                            MainTab.Home -> HomePage(activity, isCurrentPage)
-                            MainTab.Other -> OtherPage(activity, isCurrentPage)
-                            MainTab.Function -> FunctionPage(
-                                activity = activity,
-                                onOpenPage = { key, title -> navController.navigatePage(ScopeRoute(key, title)) },
-                            )
-                            MainTab.Search -> SearchPage(
-                                isCurrentPage = isCurrentPage,
-                                onOpen = { route -> navController.navigatePage(route) },
-                            )
-                            MainTab.Setting -> SettingPage(activity) {
-                                navController.navigatePage(ThemeRoute)
-                            }
-                        }
-                    }
-                },
-                themeContent = {
-                    ThemeScreen(onBack = { navController.popBackStack() })
-                },
-                scopeContent = { route ->
-                    ScopePageHost(
+            MainTabs(
+                mainPagerState = mainPagerState,
+                isActive = activity.gateDialog == null,
+            ) { tab, isCurrentPage ->
+                when (tab) {
+                    MainTab.Home -> HomePage(activity, isCurrentPage)
+                    MainTab.Other -> OtherPage(activity, isCurrentPage)
+                    MainTab.Function -> FunctionPage(
                         activity = activity,
-                        route = route,
-                        onBack = { navController.popBackStack() },
-                        onNavigate = { key, title ->
-                            navController.navigatePage(ScopeRoute(key, title.orEmpty()))
-                        },
+                        onOpenPage = { key, title -> SecondaryActivity.openScope(activity, key, title) },
                     )
-                },
-            )
+                    MainTab.Search -> SearchPage(
+                        isCurrentPage = isCurrentPage,
+                        onOpen = { route -> SecondaryActivity.openScope(activity, route) },
+                    )
+                    MainTab.Setting -> SettingPage(activity) {
+                        SecondaryActivity.openTheme(activity)
+                    }
+                }
+            }
             activity.gateDialog?.let { spec ->
                 GateDialog(
                     spec = spec,
@@ -438,10 +430,10 @@ private fun CouiTabsBottomBar(
             CouiNavigationBar(
                 modifier = Modifier.requiredWidth(menuWidth + CouiBarAttachmentSpace + 32.dp),
                 renderer = renderer,
-                // COUI 图标集没有选中/未选中成对的页签图标，两态共用同一个图形，
-                // 选中态由底栏用文字透明度区分。
+                // 两态在图形上就分开（未选中描边、选中实心），文字透明度只是附加区分。
                 items = tabs.map { tab ->
-                    CouiNavigationItem(stringResource(tab.labelRes), tab.icon(), tab.icon())
+                    val icons = tab.iconPair()
+                    CouiNavigationItem(stringResource(tab.labelRes), icons.unselected, icons.selected)
                 },
                 selectedIndex = selectedIndex,
                 dark = CouiTheme.isDark,
@@ -459,7 +451,8 @@ private fun CouiTabsBottomBar(
 }
 
 /**
- * 不依赖渲染器的 Coui 底栏：整条铺满宽度、页签均分，选中项用强调色、未选中用次级文字色。
+ * 不依赖渲染器的 Coui 底栏：整条铺满宽度、页签均分，选中项用实心图标 + 强调色，
+ * 未选中用描边图标 + 次级文字色。
  *
  * 系统底部安全区由底栏自己消费（与悬浮底栏一致），正文侧因此不必再为底栏留白；
  * 每个页签是整块可点的胶囊区，按下时长按悬停反馈由 [couiNavigationFeedback] 画；
@@ -503,8 +496,9 @@ private fun CouiFlatTabsBottomBar(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 val tabIcon: @Composable () -> Unit = {
+                    val icons = tab.iconPair()
                     Icon(
-                        imageVector = tab.icon(),
+                        imageVector = if (selected) icons.selected else icons.unselected,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                         tint = tint,
@@ -544,8 +538,6 @@ private fun PermissionGateScreen(activity: MainActivity) {
             activity = activity,
             blocking = true,
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-            // 阻塞页独立成屏，行级水平内缩由自己提供（宿主列表不在场）
-            selfInset = true,
             // 4 项齐全：撤掉阻塞门回到主界面（不重启 Activity）
             onAllGranted = { activity.refreshPermissionGate() },
             onExit = { exitProcess(0) },

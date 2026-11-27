@@ -7,10 +7,10 @@ import com.highcapable.kavaref.extension.classOf
 import com.highcapable.yukihookapi.extension.kavaref.hook
 import com.highcapable.yukihookapi.extension.kavaref.toClass
 import com.highcapable.yukihookapi.hook.entity.YukiBaseHooker
-import com.highcapable.yukihookapi.hook.log.YLog
 import com.luckyzyx.luckytool.utils.DexkitUtils.checkDataList
 import com.luckyzyx.luckytool.utils.ModulePrefs
 import com.luckyzyx.luckytool.utils.getOSVersionCode
+import com.oplus.multiapp.OplusMultiAppManager
 import org.lsposed.lsparanoid.Obfuscate
 import org.luckypray.dexkit.DexKitBridge
 
@@ -30,8 +30,10 @@ class HookAppBadge(val dexKitBridge: DexKitBridge) : YukiBaseHooker() {
             val isWork = preferences(ModulePrefs).getBoolean("remove_app_work_badge", false)
             val isClone = preferences(ModulePrefs).getBoolean("remove_app_clone_badge", false)
 
+            // 直接调用框架的 OplusMultiAppManager 分身判定接口
+
             // 宿主给桌面图标补徽标的统一入口是 BitmapInfo.applyFlags：
-            // 它按 this.flags 的位决定画工作/分身徽标。分身用户(990..999)在图标 flags
+            // 它按 this.flags 的位决定画工作/分身徽标。分身用户在图标 flags
             // 重算时可能被误判成工作资料，从而带上工作位画出工作徽标。
             // 这里用经典 before 模式而不是拦截器，是因为要改写原方法的 int 参数：
             // 给创建 flags 置 bit2 是宿主自身的跳过徽标位(OplusBubbleTextView.mHideBadge 同款)，
@@ -47,7 +49,7 @@ class HookAppBadge(val dexKitBridge: DexKitBridge) : YukiBaseHooker() {
                         if ((creationFlags and 2) != 0) return@before
                         val userHandle = userField.copy().of(instance).get<UserHandle>()
                         val userId = userHandle?.hashCode() ?: -1
-                        val isCloneUser = userId in 990..999
+                        val isCloneUser = OplusMultiAppManager.getInstance().isMultiAppUserId(userId)
                         val needClearBadge = when {
                             isClone && isCloneUser -> true
                             isWork && userId != 0 && !isCloneUser -> true
@@ -65,7 +67,6 @@ class HookAppBadge(val dexKitBridge: DexKitBridge) : YukiBaseHooker() {
                             flagsField.copy().of(instance).set(correctedFlag)
                         }
                         arg(2).set(creationFlags or 2)
-                        YLog.debug("applyFlags hide badge: user=$userId, cloneUser=$isCloneUser, flag=$rawFlag->$correctedFlag")
                     }
                 }
             }
@@ -75,21 +76,31 @@ class HookAppBadge(val dexKitBridge: DexKitBridge) : YukiBaseHooker() {
             // getUserBadgeForDensity，分身资料运行时会拿到工作徽标，所以这里把返回值置空。
             // C16 及以下类名与方法名均未混淆，按名字定位；C17 起方法被混淆为 b(UserHandle)，只能经 DexKit 定位。
             if (osCode >= 40) {
-                dexKitBridge.findMethod {
+                dexKitBridge.findClass {
                     matcher {
-                        paramTypes(classOf<UserHandle>())
-                        returnType(classOf<Drawable>())
+                        methods {
+                            add {
+                                paramTypes(classOf<UserHandle>())
+                                returnType(classOf<Drawable>())
+                            }
+                        }
                     }
                 }.apply {
-                    checkDataList("getCloneAppDrawable")
-                }.single().getMethodInstance(hostClassLoader!!).hook {
-                    after {
-                        if (!isClone) return@after
-                        YLog.debug("getCloneAppDrawable hide clone badge, user=" + firstArg().get<UserHandle>()?.hashCode())
-                        result = null
+                    checkDataList("getCloneAppDrawable class")
+                    findMethod {
+                        matcher {
+                            paramTypes(classOf<UserHandle>())
+                            returnType(classOf<Drawable>())
+                        }
+                    }.apply {
+                        checkDataList("getCloneAppDrawable")
+                    }.single().getMethodInstance(hostClassLoader!!).hook {
+                        after {
+                            if (!isClone) return@after
+                            result = null
+                        }
                     }
                 }
-                YLog.debug("getCloneAppDrawable hook registered")
             } else {
                 "com.android.common.util.CacheUtils".toClass().resolve()
                     .firstMethod {
@@ -98,7 +109,6 @@ class HookAppBadge(val dexKitBridge: DexKitBridge) : YukiBaseHooker() {
                     }.hook {
                         after {
                             if (!isClone) return@after
-                            YLog.debug("getCloneAppDrawable hide clone badge")
                             result = null
                         }
                     }
